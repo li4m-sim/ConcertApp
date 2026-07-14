@@ -7,7 +7,8 @@ load_dotenv()
 SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID", "")
 SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET", "")
 SPOTIFY_REDIRECT_URI = os.getenv("SPOTIFY_REDIRECT_URI", "http://localhost:8888/callback")
-SPOTIFY_CACHE_PATH = os.path.expanduser("~/.cache/spotifyapp")
+SPOTIFY_CACHE_PATH = os.path.join(os.path.expanduser("~"), ".spotifyapp_cache")
+#SPOTIFY_CACHE_PATH = os.path.expanduser("~/.cache/spotifyapp")
 
 SPOTIFY_SCOPES = [
     "user-top-read",
