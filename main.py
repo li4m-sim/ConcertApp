@@ -58,7 +58,7 @@ def manage_artists(sp: spotipy.Spotify) -> List[Artist]:
 
         if "searched" in sources:
             searched = menus.ask_specific_artists(sp)
-            combined.extend(searched)
+            combined.extend([a for a in (searched or []) if hasattr(a, "id")])
 
         # Deduplicate by Spotify ID (keep first occurrence, preserve source)
         seen_ids = set()
@@ -94,8 +94,8 @@ def manage_artists(sp: spotipy.Spotify) -> List[Artist]:
 
             elif action == "add":
                 added = menus.ask_specific_artists(sp)
-                for artist in added:
-                    if artist.id not in {a.id for a in combined}:
+                for artist in (added or []):
+                    if hasattr(artist, "id") and artist.id not in {a.id for a in combined}:
                         combined.append(artist)
 
             elif action == "restart":

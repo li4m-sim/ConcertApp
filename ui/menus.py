@@ -238,7 +238,7 @@ def ask_specific_artists(sp: "spotipy.Spotify") -> List["Artist"]:
             style=STYLE,
         ).ask()
 
-        if pick is not None:
+        if pick is not None and hasattr(pick, "id"):
             selected.append(pick)
 
         add_more = questionary.confirm(
