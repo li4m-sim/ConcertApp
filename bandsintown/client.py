@@ -2,6 +2,7 @@ from typing import List, Optional
 import requests
 from bandsintown.models import Concert
 from config import BANDSINTOWN_APP_ID
+from ui.menus import COUNTRIES
 
 BASE_URL = "https://rest.bandsintown.com"
 
@@ -86,40 +87,5 @@ def search_concerts(
     return concerts
 
 
-# --- Country code -> name mapping (subset matching Bandsintown responses) ---
-
-_CODE_TO_NAME = {
-    "AT": "Austria",
-    "AU": "Australia",
-    "BE": "Belgium",
-    "BR": "Brazil",
-    "CA": "Canada",
-    "CH": "Switzerland",
-    "CZ": "Czech Republic",
-    "DE": "Germany",
-    "DK": "Denmark",
-    "ES": "Spain",
-    "FI": "Finland",
-    "FR": "France",
-    "GB": "United Kingdom",
-    "GR": "Greece",
-    "HU": "Hungary",
-    "IE": "Ireland",
-    "IT": "Italy",
-    "JP": "Japan",
-    "MX": "Mexico",
-    "NL": "Netherlands",
-    "NO": "Norway",
-    "NZ": "New Zealand",
-    "PL": "Poland",
-    "PT": "Portugal",
-    "RO": "Romania",
-    "SE": "Sweden",
-    "TR": "Turkey",
-    "US": "United States",
-    "ZA": "South Africa",
-}
-
-
 def _country_code_to_name(code: str) -> str:
-    return _CODE_TO_NAME.get(code.upper(), code)
+    return COUNTRIES.get(code.upper(), code)

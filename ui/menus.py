@@ -15,38 +15,138 @@ STYLE = Style([
     ("instruction", "fg:#6c6c6c"),
 ])
 
-# ISO country codes with display names
-COUNTRIES = {
-    "AT": "Austria",
-    "AU": "Australia",
-    "BE": "Belgium",
-    "BR": "Brazil",
-    "CA": "Canada",
-    "CH": "Switzerland",
-    "CZ": "Czech Republic",
-    "DE": "Germany",
-    "DK": "Denmark",
-    "ES": "Spain",
-    "FI": "Finland",
-    "FR": "France",
-    "GB": "United Kingdom",
-    "GR": "Greece",
-    "HU": "Hungary",
-    "IE": "Ireland",
-    "IT": "Italy",
-    "JP": "Japan",
-    "MX": "Mexico",
-    "NL": "Netherlands",
-    "NO": "Norway",
-    "NZ": "New Zealand",
-    "PL": "Poland",
-    "PT": "Portugal",
-    "RO": "Romania",
-    "SE": "Sweden",
-    "TR": "Turkey",
-    "US": "United States",
-    "ZA": "South Africa",
+# Countries grouped by continent
+CONTINENTS = {
+    "Europe": {
+        "AL": "Albania",
+        "AD": "Andorra",
+        "AT": "Austria",
+        "BY": "Belarus",
+        "BE": "Belgium",
+        "BA": "Bosnia and Herzegovina",
+        "BG": "Bulgaria",
+        "HR": "Croatia",
+        "CY": "Cyprus",
+        "CZ": "Czech Republic",
+        "DK": "Denmark",
+        "EE": "Estonia",
+        "FI": "Finland",
+        "FR": "France",
+        "DE": "Germany",
+        "GR": "Greece",
+        "HU": "Hungary",
+        "IS": "Iceland",
+        "IE": "Ireland",
+        "IT": "Italy",
+        "XK": "Kosovo",
+        "LV": "Latvia",
+        "LI": "Liechtenstein",
+        "LT": "Lithuania",
+        "LU": "Luxembourg",
+        "MT": "Malta",
+        "MD": "Moldova",
+        "MC": "Monaco",
+        "ME": "Montenegro",
+        "NL": "Netherlands",
+        "MK": "North Macedonia",
+        "NO": "Norway",
+        "PL": "Poland",
+        "PT": "Portugal",
+        "RO": "Romania",
+        "RU": "Russia",
+        "SM": "San Marino",
+        "RS": "Serbia",
+        "SK": "Slovakia",
+        "SI": "Slovenia",
+        "ES": "Spain",
+        "SE": "Sweden",
+        "CH": "Switzerland",
+        "UA": "Ukraine",
+        "GB": "United Kingdom",
+    },
+    "North America": {
+        "CA": "Canada",
+        "CR": "Costa Rica",
+        "CU": "Cuba",
+        "DO": "Dominican Republic",
+        "GT": "Guatemala",
+        "HN": "Honduras",
+        "JM": "Jamaica",
+        "MX": "Mexico",
+        "PA": "Panama",
+        "PR": "Puerto Rico",
+        "TT": "Trinidad and Tobago",
+        "US": "United States",
+    },
+    "South America": {
+        "AR": "Argentina",
+        "BO": "Bolivia",
+        "BR": "Brazil",
+        "CL": "Chile",
+        "CO": "Colombia",
+        "EC": "Ecuador",
+        "PY": "Paraguay",
+        "PE": "Peru",
+        "UY": "Uruguay",
+        "VE": "Venezuela",
+    },
+    "Asia": {
+        "CN": "China",
+        "HK": "Hong Kong",
+        "IN": "India",
+        "ID": "Indonesia",
+        "JP": "Japan",
+        "KZ": "Kazakhstan",
+        "MY": "Malaysia",
+        "MN": "Mongolia",
+        "PH": "Philippines",
+        "SG": "Singapore",
+        "KR": "South Korea",
+        "TW": "Taiwan",
+        "TH": "Thailand",
+        "VN": "Vietnam",
+    },
+    "Middle East": {
+        "BH": "Bahrain",
+        "IL": "Israel",
+        "JO": "Jordan",
+        "KW": "Kuwait",
+        "LB": "Lebanon",
+        "OM": "Oman",
+        "QA": "Qatar",
+        "SA": "Saudi Arabia",
+        "TR": "Turkey",
+        "AE": "United Arab Emirates",
+    },
+    "Oceania": {
+        "AU": "Australia",
+        "FJ": "Fiji",
+        "NZ": "New Zealand",
+    },
+    "Africa": {
+        "DZ": "Algeria",
+        "EG": "Egypt",
+        "ET": "Ethiopia",
+        "GH": "Ghana",
+        "KE": "Kenya",
+        "MA": "Morocco",
+        "NG": "Nigeria",
+        "SN": "Senegal",
+        "ZA": "South Africa",
+        "TN": "Tunisia",
+        "UG": "Uganda",
+    },
 }
+
+# Flat dict of all countries for lookup elsewhere in the app
+COUNTRIES = {
+    code: name
+    for region in CONTINENTS.values()
+    for code, name in region.items()
+}
+
+# Reverse lookup: lowercase name -> code
+_NAME_TO_CODE = {name.lower(): code for code, name in COUNTRIES.items()}
 
 
 def ask_artist_source() -> str:
@@ -76,17 +176,91 @@ def ask_time_range() -> str:
 
 
 def ask_countries() -> List[str]:
-    """Multi-select list of countries to search concerts in."""
-    choices = [
-        questionary.Choice(f"{name} ({code})", value=code)
-        for code, name in sorted(COUNTRIES.items(), key=lambda x: x[1])
+    """
+    2-step country selection:
+    Step 1 — choose a continent, all countries, or pick specific ones.
+    Step 2 — if picking specific: autocomplete search loop.
+    """
+    # Build step 1 choices
+    continent_choices = [
+        questionary.Choice(f"All of {continent}", value=f"continent:{continent}")
+        for continent in CONTINENTS.keys()
     ]
-    selected = questionary.checkbox(
-        "Select countries to search for concerts (space to select, enter to confirm):",
-        choices=choices,
+    continent_choices.append(questionary.Choice("Pick specific countries", value="specific"))
+    continent_choices.append(questionary.Choice("Select all countries", value="all"))
+
+    scope = questionary.select(
+        "Which countries should we search for concerts in?",
+        choices=continent_choices,
         style=STYLE,
     ).ask()
-    return selected or []
+
+    if scope is None:
+        return []
+
+    if scope == "all":
+        return list(COUNTRIES.keys())
+
+    if scope.startswith("continent:"):
+        continent_name = scope.split(":", 1)[1]
+        return list(CONTINENTS[continent_name].keys())
+
+    # "specific" — autocomplete loop
+    return _ask_specific_countries()
+
+
+def _ask_specific_countries() -> List[str]:
+    """
+    Autocomplete loop — user types to search for a country,
+    selects it, then optionally adds more.
+    """
+    # Build autocomplete list: "Germany (DE)", sorted by name
+    all_options = sorted(
+        [f"{name} ({code})" for code, name in COUNTRIES.items()],
+        key=lambda x: x.lower(),
+    )
+
+    selected_codes = []
+    selected_labels = []
+
+    while True:
+        # Show already selected countries
+        if selected_labels:
+            prompt = f"Add another country? (selected: {', '.join(selected_labels)})"
+        else:
+            prompt = "Type to search for a country:"
+
+        answer = questionary.autocomplete(
+            prompt,
+            choices=all_options,
+            style=STYLE,
+            validate=lambda val: val in all_options or val == "" or "Type a country name to search",
+            ignore_case=True,
+        ).ask()
+
+        # Empty input or cancelled — done
+        if not answer:
+            break
+
+        # Parse "Germany (DE)" -> code "DE"
+        if "(" in answer and answer.endswith(")"):
+            code = answer.split("(")[-1].rstrip(")")
+            name = answer.split(" (")[0]
+            if code not in selected_codes:
+                selected_codes.append(code)
+                selected_labels.append(name)
+
+        # Ask if they want to add more
+        add_more = questionary.confirm(
+            "Add another country?",
+            default=True,
+            style=STYLE,
+        ).ask()
+
+        if not add_more:
+            break
+
+    return selected_codes
 
 
 def ask_radius_search() -> Tuple[Optional[str], Optional[int]]:
