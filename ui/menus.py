@@ -253,6 +253,21 @@ def ask_specific_artists(sp: "spotipy.Spotify") -> List["Artist"]:
     return selected
 
 
+def ask_no_artists_found() -> str:
+    """
+    Ask what to do when no artists were found/selected.
+    Returns 'retry' or 'exit'.
+    """
+    return questionary.select(
+        "No artists selected. What would you like to do?",
+        choices=[
+            questionary.Choice("Try again", value="retry"),
+            questionary.Choice("Exit", value="exit"),
+        ],
+        style=STYLE,
+    ).ask()
+
+
 # ---------------------------------------------------------------------------
 # Artist review / editing
 # ---------------------------------------------------------------------------

@@ -70,7 +70,10 @@ def manage_artists(sp: spotipy.Spotify) -> List[Artist]:
         combined = unique
 
         if not combined:
-            display.print_info("No artists found. Please try again.")
+            action = menus.ask_no_artists_found()
+            if action == "exit":
+                console.print("\n[bold green]Goodbye![/bold green]")
+                sys.exit(0)
             continue
 
         # Step 3 — review / edit loop
