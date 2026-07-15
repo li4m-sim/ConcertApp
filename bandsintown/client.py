@@ -1,11 +1,57 @@
-from typing import List, Optional
+from typing import List, Optional, Tuple, Dict
 from datetime import date
+import math
 import requests
 from bandsintown.models import Concert
 from config import BANDSINTOWN_APP_ID
 from ui.menus import COUNTRIES
 
 BASE_URL = "https://rest.bandsintown.com"
+NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
+
+# In-memory cache for geocoded cities within a single run
+_geocode_cache: Dict[str, Optional[Tuple[float, float]]] = {}
+
+
+def _geocode(city: str) -> Optional[Tuple[float, float]]:
+    """
+    Convert a city name to (latitude, longitude) using the Nominatim API.
+    Returns None if the city cannot be found.
+    Results are cached for the lifetime of the process.
+    """
+    key = city.strip().lower()
+    if key in _geocode_cache:
+        return _geocode_cache[key]
+
+    try:
+        resp = requests.get(
+            NOMINATIM_URL,
+            params={"q": city, "format": "json", "limit": 1},
+            headers={"User-Agent": "SpotifyApp/1.0 (concert-radius-search)"},
+            timeout=10,
+        )
+        if resp.ok:
+            results = resp.json()
+            if results:
+                lat = float(results[0]["lat"])
+                lon = float(results[0]["lon"])
+                _geocode_cache[key] = (lat, lon)
+                return (lat, lon)
+    except Exception:
+        pass
+
+    _geocode_cache[key] = None
+    return None
+
+
+def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Return the great-circle distance in km between two (lat, lon) points."""
+    R = 6371.0  # Earth radius in km
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlambda = math.radians(lon2 - lon1)
+    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
+    return R * 2 * math.asin(math.sqrt(a))
 
 
 def get_artist_events(
@@ -130,17 +176,20 @@ def search_concerts(
     artist_name: str,
     country_codes: List[str],
     city: Optional[str] = None,
+    radius_km: Optional[int] = None,
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
     debug: bool = False,
 ) -> List[Concert]:
     """
-    Search for concerts for an artist, filtered by countries, date range, and optionally city.
+    Search for concerts for an artist, filtered by countries, date range, and optionally
+    a city radius (geocoded via Nominatim).
 
     Args:
         artist_name: Artist name to search
         country_codes: ISO country codes to include. Empty list = all locations.
-        city: Optional city name to filter by (substring match)
+        city: Optional reference city for radius filtering
+        radius_km: Radius in km around city. Requires city to be set.
         date_from: Optional start date filter (inclusive)
         date_to: Optional end date filter (inclusive)
         debug: If True, surface API errors and filter stats
@@ -148,6 +197,8 @@ def search_concerts(
     Returns:
         Filtered, sorted list of Concert objects
     """
+    from ui import display
+
     concerts = get_artist_events(
         artist_name,
         country_codes=country_codes,
@@ -156,8 +207,29 @@ def search_concerts(
         debug=debug,
     )
 
-    # Optional city filter (case-insensitive substring match)
-    if city:
+    # Radius filter — geocode reference city, then filter by distance
+    if city and radius_km:
+        ref_coords = _geocode(city)
+        if ref_coords is None:
+            if debug:
+                display.print_info(f"[DEV] Could not geocode reference city: {city!r}")
+        else:
+            ref_lat, ref_lon = ref_coords
+            filtered = []
+            for c in concerts:
+                concert_city_str = f"{c.city}, {c.country}"
+                concert_coords = _geocode(concert_city_str)
+                if concert_coords is None:
+                    concert_coords = _geocode(c.city)
+                if concert_coords is not None:
+                    dist = _haversine_km(ref_lat, ref_lon, concert_coords[0], concert_coords[1])
+                    if dist <= radius_km:
+                        filtered.append(c)
+                elif debug:
+                    display.print_info(f"[DEV] Could not geocode concert city: {concert_city_str!r}")
+            concerts = filtered
+    elif city:
+        # Fallback: plain substring match if no radius given
         city_lower = city.lower()
         concerts = [c for c in concerts if city_lower in c.city.lower()]
 

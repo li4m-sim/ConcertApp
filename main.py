@@ -119,6 +119,7 @@ def find_concerts(
             artist_name=artist.name,
             country_codes=country_codes,
             city=city,
+            radius_km=radius_km,
             date_from=date_from,
             date_to=date_to,
             debug=config.DEBUG_MODE,
