@@ -2,7 +2,7 @@
 
 ---
 
-_For Doris_
+_For Doris_  
 _my favourite person in every room, in every city, in every crowd._
 
 There is a particular kind of magic that only happens live. When the lights
@@ -37,10 +37,10 @@ This is for every concert you have not yet been to.
 Every song not yet heard live.
 Every night not yet danced through.
 
-Go find them all, _Srce_.
+Go find them all, _Srce_.  
 I will be right there beside you.
 
-_Yours, always_
+_Yours, always_  
 _Liam_
 
 ---
